@@ -81,13 +81,19 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 input[type=color]{width:40px;height:32px;padding:0 2px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer}
 select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 .note{font-size:13px;color:var(--muted);margin:0}
+.en{display:block;font-family:var(--body);font-size:12px;font-weight:400;color:var(--muted);line-height:1.3;letter-spacing:0}
+.picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.picker select{flex:1;min-width:0;max-width:100%}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint b{color:var(--ink);font-weight:500}
+.card.locked .wheel-box{opacity:.4}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div>
     <h1>洋裝轉盤</h1>
-    <p class="sub">上衣、裙襬、袖子、領子各轉一次，組出一件洋裝。</p>
+    <p class="sub">先轉出上衣，再從能搭這件上衣的袖子和領子裡轉，裙襬每件都能配。</p>
   </div>
 
   <section class="combo" aria-live="polite">
@@ -127,6 +133,7 @@ select{font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--lin
    如果圖片在別的位置，把 IMAGE_BASE 改成那個網址，結尾要有 /，例如
    'https://raw.githubusercontent.com/帳號/repo/main/'                      */
 const IMAGE_BASE = './';
+const EXT = '.webp';
 
 const WHEELS = [
   { key:'top', name:'上衣', folder:'上衣', files:`yoked-shirt apron-bodice aurora-bodice belladonna-bodice belted-jacket-bodice bolero-bodice bustier-bodice cinched-keyhole-blouse coat-dress-bodice corset-bodice delilah-bodice dirndl double-breasted-bodice elevated-dirndl elevated-princess-v-bodice elevated-scoop-bodice elevated-scoop-ruffle-bodice elevated-stays elevated-sweetheart-bodice flared-begonia-bodice front-lace-bodice front-lace-stays gatsby-bodice halter-neck-bodice heart-princess-bodice jacket-bodice kaftan-wrap-bodice katarina-bodice kimono-bodice land-girl-bodice milkmaid-bodice off-shoulder-begonia-bodice one-shoulder-bodice plunging-neckline-bodice princess-bodice princess-scoop-bodice princess-v-bodice princess-v-elevated-ruffle-bodice princess-v-ruffle-bodice queen-anne-bodice ruched-bodice ruched-sweetheart-bodice ruffle-apron-bodice sax-bodice scoop-ruffle-bodice single-keyhole-bodice split-crew-bodice square-bodice straight-begonia-bodice strapless-bodice sweetheart-bodice twilight-hour-bodice upturned-yoked-bodice viper-bodice v-neck-yoked-shirt waistcoat-bodice waterfall-bodice wrap-bodice yoked-jacket-bodice` },
@@ -134,7 +141,229 @@ const WHEELS = [
   { key:'sleeve', name:'袖子', folder:'袖子', files:`tiered-sleeves angel-sleeve angels-trumpet-sleeve arwen-sleeve bell-sleeve bracelet-sleeve butterfly-sleeve cap-sleeve capulet-sleeve chanterelle-sleeve elbow-length-juliet-sleeve fae-sleeve flounce-sleeve flutter-sleeve gabriel-sleeve godiva-sleeve hecate-sleeve juliette-bishop-sleeve juliette-sleeve long-cuffed-sleeve long-sleeve mutton-sleeve peasant-sleeve peasant-sleeve-with-ruffle-cuff petal-sleeve pleated-drop-sleeve poet-sleeve short-puffed-sleeve short-sleeve slit-sleeve` },
   { key:'collar', name:'領子', folder:'領子', files:`belladonna-collar dagger-collar double-ruffle-and-bow-collar fable-collar gothic-collar mandarin-collar notched-shirt-collar open-shirt-collar oversized-wing-collar peter-pan-collar pointed-collar pussybow-collar qipao-collar sailor-collar scalloped-collar serafuku-collar upright-frill-collar viper-collar whirlpool-collar widows-peak-collar` },
 ];
-const EXT = '.webp';
+
+/* 中文名稱：檔名 → 中文 */
+const NAMES = {
+  "princess-bodice":"公主線衣身",
+  "square-bodice":"方領衣身",
+  "princess-scoop-bodice":"大圓領公主線衣身",
+  "milkmaid-bodice":"女僕裝衣身",
+  "sweetheart-bodice":"心形領衣身",
+  "strapless-bodice":"無肩帶衣身",
+  "princess-v-bodice":"V領公主線衣身",
+  "one-shoulder-bodice":"單肩式衣身",
+  "single-keyhole-bodice":"單水滴領衣身",
+  "plunging-neckline-bodice":"深V領衣身",
+  "elevated-scoop-ruffle-bodice":"加高大圓領荷葉邊衣身",
+  "scoop-ruffle-bodice":"大圓領荷葉邊衣身",
+  "cinched-keyhole-blouse":"收腰水滴領女衫",
+  "kimono-bodice":"和服式衣身",
+  "waistcoat-bodice":"馬甲式衣身",
+  "v-neck-yoked-shirt":"V領育克襯衫",
+  "yoked-shirt":"育克襯衫",
+  "split-crew-bodice":"小圓領開衩衣身",
+  "ruched-bodice":"抽褶衣身",
+  "upturned-yoked-bodice":"立式育克衣身",
+  "heart-princess-bodice":"心形領公主線衣身",
+  "elevated-sweetheart-bodice":"加高心形領衣身",
+  "ruched-sweetheart-bodice":"褶襉心形領衣身",
+  "aurora-bodice":"極光衣身",
+  "bolero-bodice":"波萊羅短款衣身",
+  "apron-bodice":"圍裙式衣身",
+  "ruffle-apron-bodice":"荷葉邊圍裙式衣身",
+  "bustier-bodice":"抹胸式衣身",
+  "off-shoulder-begonia-bodice":"一字領秋海棠衣身",
+  "wrap-bodice":"裹身式衣身",
+  "sax-bodice":"薩克式衣身",
+  "flared-begonia-bodice":"喇叭形秋海棠衣身",
+  "coat-dress-bodice":"外套裙衣身",
+  "front-lace-bodice":"前繫帶衣身",
+  "halter-neck-bodice":"掛脖式衣身",
+  "straight-begonia-bodice":"直筒秋海棠衣身",
+  "kaftan-wrap-bodice":"卡夫坦裹身衣身",
+  "corset-bodice":"束腰式衣身",
+  "gatsby-bodice":"蓋茨比衣身",
+  "queen-anne-bodice":"安妮女王式衣身",
+  "front-lace-stays":"前繫帶緊身胸衣",
+  "dirndl":"緊腰闊襬裙",
+  "elevated-dirndl":"加高緊腰闊襬裙",
+  "elevated-stays":"加高緊身胸衣",
+  "land-girl-bodice":"農莊女孩衣身",
+  "elevated-scoop-bodice":"加高大圓領衣身",
+  "princess-v-ruffle-bodice":"V領荷葉邊公主線衣身",
+  "elevated-princess-v-bodice":"加高V領公主線衣身",
+  "princess-v-elevated-ruffle-bodice":"V領加高荷葉邊公主線衣身",
+  "twilight-hour-bodice":"暮光時刻衣身",
+  "viper-bodice":"毒蛇衣身",
+  "belladonna-bodice":"貝拉多娜衣身",
+  "katarina-bodice":"卡特琳娜衣身",
+  "jacket-bodice":"夾克式衣身",
+  "waterfall-bodice":"瀑布領衣身",
+  "yoked-jacket-bodice":"育克夾克式衣身",
+  "double-breasted-bodice":"雙排扣衣身",
+  "belted-jacket-bodice":"繫帶夾克式衣身",
+  "delilah-bodice":"黛麗拉衣身",
+  "princess-skirt":"公主裙襬",
+  "circle-skirt":"全圓裙襬",
+  "gathered-ballgown-skirt":"抽褶舞會裙襬",
+  "pencil-skirt":"鉛筆裙襬",
+  "mermaid-skirt":"魚尾裙襬",
+  "straight-long-skirt":"直筒長裙襬",
+  "flare-skirt":"傘式裙襬",
+  "bias-cut-skirt":"斜裁裙襬",
+  "puffy-gathered-tiered-skirt":"蓬鬆抽褶塔裙裙襬",
+  "single-tiered-skirt":"單層腰線塔裙裙襬",
+  "waistcoat-skirt":"馬甲式裙襬",
+  "curved-peplum-skirt":"弧形腰襬裙",
+  "yoke-gathered-skirt":"育克抽褶裙襬",
+  "petal-peplum-skirt":"花瓣形腰襬裙",
+  "split-skirt":"開衩裙襬",
+  "tulip-hip-skirt":"鬱金香形臀圍裙",
+  "circle-peplum-skirt":"全圓式腰襬裙",
+  "bow-ballgown-skirt":"蝴蝶結舞會裙襬",
+  "apron-skirt":"圍裙式裙襬",
+  "straight-gathered-tiered-skirt":"直筒抽褶塔裙裙襬",
+  "ruffle-skirt":"荷葉邊裙襬",
+  "wrap-skirt":"裹身裙襬",
+  "coat-dress-skirt":"外套裙裙襬",
+  "bow-skirt":"蝴蝶結裙襬",
+  "handkerchief-godet-skirt":"手帕式鑲楔裙襬",
+  "kaftan-skirt":"卡夫坦裙襬",
+  "corset-skirt":"束腰裙襬",
+  "gatsby-skirt":"蓋茨比裙襬",
+  "koi-skirt":"錦鯉裙襬",
+  "dita-pencil-skirt":"蒂塔鉛筆裙襬",
+  "frill-skirt":"荷葉邊裙襬",
+  "chrysanthemum-skirt":"菊花形裙襬",
+  "mother-of-pearl-skirt":"珍珠母貝裙襬",
+  "gathered-tiered-ruffle-skirt":"抽褶塔狀荷葉邊裙襬",
+  "poinsetta-skirt":"一品紅裙襬",
+  "train-skirt":"拖尾裙襬",
+  "twilight-hour-skirt":"暮光時刻裙襬",
+  "viper-skirt":"毒蛇裙襬",
+  "belladonna-skirt":"貝拉多娜裙襬",
+  "godet-skirt":"鑲楔喇叭裙襬",
+  "scallop-skirt":"扇貝邊裙襬",
+  "waterfall-skirt":"瀑布形裙襬",
+  "wavecrest-skirt":"浪峰裙襬",
+  "basque-tiered-skirt":"巴斯克腰線塔裙裙襬",
+  "bustle-skirt":"巴斯爾裙襬",
+  "odette-skirt":"奧黛特裙襬",
+  "peter-pan-collar":"娃娃領",
+  "notched-shirt-collar":"缺口襯衫領",
+  "open-shirt-collar":"敞角襯衫領",
+  "pointed-collar":"尖領",
+  "oversized-wing-collar":"寬版燕子領",
+  "pussybow-collar":"蝴蝶結領",
+  "upright-frill-collar":"直立褶飾領",
+  "scalloped-collar":"扇貝邊領",
+  "mandarin-collar":"中式立領",
+  "whirlpool-collar":"漩渦領",
+  "dagger-collar":"匕首領",
+  "double-ruffle-and-bow-collar":"雙層荷葉邊蝴蝶結領",
+  "fable-collar":"童話領",
+  "widows-peak-collar":"美人尖形領",
+  "viper-collar":"毒蛇領",
+  "belladonna-collar":"貝拉多娜領",
+  "gothic-collar":"哥特領",
+  "qipao-collar":"旗袍領",
+  "sailor-collar":"海軍領",
+  "serafuku-collar":"日式水手領",
+  "cap-sleeve":"短袖",
+  "long-sleeve":"長袖",
+  "bracelet-sleeve":"七分袖",
+  "butterfly-sleeve":"蝴蝶袖",
+  "peasant-sleeve":"農婦袖",
+  "flounce-sleeve":"荷葉袖",
+  "short-puffed-sleeve":"短泡泡袖",
+  "mutton-sleeve":"羊腿袖",
+  "short-sleeve":"短袖",
+  "juliette-bishop-sleeve":"朱麗葉主教袖",
+  "pleated-drop-sleeve":"褶襉落肩袖",
+  "gabriel-sleeve":"加百列袖",
+  "long-cuffed-sleeve":"翻邊收口長袖",
+  "godiva-sleeve":"歌帝梵袖",
+  "slit-sleeve":"開叉袖",
+  "tiered-sleeves":"層疊袖",
+  "fae-sleeve":"精靈袖",
+  "chanterelle-sleeve":"雞油菌袖",
+  "petal-sleeve":"花瓣袖",
+  "hecate-sleeve":"赫卡忒袖",
+  "juliette-sleeve":"朱麗葉袖",
+  "peasant-sleeve-with-ruffle-cuff":"荷葉邊袖口農婦袖",
+  "elbow-length-juliet-sleeve":"齊肘朱麗葉袖",
+  "angels-trumpet-sleeve":"曼陀羅花袖",
+  "arwen-sleeve":"阿爾溫袖",
+  "bell-sleeve":"喇叭袖",
+  "poet-sleeve":"詩人袖",
+  "capulet-sleeve":"凱普萊特袖",
+  "flutter-sleeve":"飄袖",
+  "angel-sleeve":"天使袖"
+};
+
+/* 搭配表：上衣檔名 → 能配的袖子、領子（'all' 代表全部都能配）。
+   「不加袖子」「不加領子」每件上衣都能選，不用寫在這裡。 */
+const COMPAT = {
+  "princess-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "square-bodice":{sleeve:"all", collar:"all"},
+  "princess-scoop-bodice":{sleeve:"all", collar:"all"},
+  "milkmaid-bodice":{sleeve:"all", collar:"all"},
+  "sweetheart-bodice":{sleeve:"all", collar:["widows-peak-collar", "viper-collar"]},
+  "strapless-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "princess-v-bodice":{sleeve:"all", collar:["notched-shirt-collar", "open-shirt-collar", "oversized-wing-collar", "scalloped-collar", "gothic-collar", "sailor-collar", "serafuku-collar"]},
+  "one-shoulder-bodice":{sleeve:"all", collar:"all"},
+  "single-keyhole-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "plunging-neckline-bodice":{sleeve:"all", collar:"all"},
+  "elevated-scoop-ruffle-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "scoop-ruffle-bodice":{sleeve:"all", collar:"all"},
+  "cinched-keyhole-blouse":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "kimono-bodice":{sleeve:[], collar:"all"},
+  "waistcoat-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "v-neck-yoked-shirt":{sleeve:"all", collar:["notched-shirt-collar", "open-shirt-collar", "oversized-wing-collar", "scalloped-collar", "gothic-collar", "sailor-collar", "serafuku-collar"]},
+  "yoked-shirt":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "split-crew-bodice":{sleeve:"all", collar:"all"},
+  "ruched-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "upturned-yoked-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "heart-princess-bodice":{sleeve:"all", collar:"all"},
+  "elevated-sweetheart-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "ruched-sweetheart-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "aurora-bodice":{sleeve:["angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "bolero-bodice":{sleeve:"all", collar:"all"},
+  "apron-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "ruffle-apron-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "bustier-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:"all"},
+  "off-shoulder-begonia-bodice":{sleeve:["angels-trumpet-sleeve", "arwen-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "wrap-bodice":{sleeve:"all", collar:["notched-shirt-collar", "open-shirt-collar", "oversized-wing-collar", "scalloped-collar", "gothic-collar", "sailor-collar", "serafuku-collar"]},
+  "sax-bodice":{sleeve:"all", collar:"all"},
+  "flared-begonia-bodice":{sleeve:"all", collar:"all"},
+  "coat-dress-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "front-lace-bodice":{sleeve:"all", collar:"all"},
+  "halter-neck-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:"all"},
+  "straight-begonia-bodice":{sleeve:["pleated-drop-sleeve", "angels-trumpet-sleeve", "angel-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "kaftan-wrap-bodice":{sleeve:"all", collar:"all"},
+  "corset-bodice":{sleeve:"all", collar:"all"},
+  "gatsby-bodice":{sleeve:"all", collar:"all"},
+  "queen-anne-bodice":{sleeve:"all", collar:"all"},
+  "front-lace-stays":{sleeve:"all", collar:"all"},
+  "dirndl":{sleeve:"all", collar:"all"},
+  "elevated-dirndl":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "elevated-stays":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "land-girl-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "elevated-scoop-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "princess-v-ruffle-bodice":{sleeve:"all", collar:"all"},
+  "elevated-princess-v-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "princess-v-elevated-ruffle-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "twilight-hour-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:"all"},
+  "viper-bodice":{sleeve:["pleated-drop-sleeve", "gabriel-sleeve", "angels-trumpet-sleeve", "arwen-sleeve", "angel-sleeve"], collar:["widows-peak-collar", "viper-collar"]},
+  "belladonna-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "katarina-bodice":{sleeve:"all", collar:"all"},
+  "jacket-bodice":{sleeve:"all", collar:"all"},
+  "waterfall-bodice":{sleeve:"all", collar:["notched-shirt-collar", "open-shirt-collar", "oversized-wing-collar", "scalloped-collar", "gothic-collar", "sailor-collar", "serafuku-collar"]},
+  "yoked-jacket-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "double-breasted-bodice":{sleeve:"all", collar:["notched-shirt-collar", "open-shirt-collar", "oversized-wing-collar", "scalloped-collar", "gothic-collar", "sailor-collar", "serafuku-collar"]},
+  "belted-jacket-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "dagger-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]},
+  "delilah-bodice":{sleeve:"all", collar:["peter-pan-collar", "pointed-collar", "pussybow-collar", "upright-frill-collar", "mandarin-collar", "whirlpool-collar", "double-ruffle-and-bow-collar", "fable-collar", "belladonna-collar", "qipao-collar"]}
+};
 /* ===== 設定區結束 ===== */
 
 (function(){
@@ -156,37 +385,87 @@ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(settings))}catch(e){
 
 const pretty=s=>s.split('-').map(w=>w==='v'?'V':w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
 const PLACEHOLDER='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#eceff5"/></svg>');
+const NONE_IMG='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><circle cx="50" cy="50" r="30" fill="none" stroke="#9aa4c2" stroke-width="6"/><line x1="29" y1="71" x2="71" y2="29" stroke="#9aa4c2" stroke-width="6"/></svg>');
+const byKey={};
 
 let drawQueued=new Set();
 function queueDraw(W){if(!drawQueued.size)requestAnimationFrame(()=>{drawQueued.forEach(draw);drawQueued.clear()});drawQueued.add(W)}
 
-// build wheels
+const DEPENDS={sleeve:true,collar:true};   // 這兩個轉盤要看上衣
+let currentTop=null;
+const PICKABLE={top:true,skirt:true};   // 有「直接選」選單的轉盤
+
 WHEELS.forEach(W=>{
-  W.items=W.files.trim().split(/\s+/).map(f=>{
+  byKey[W.key]=W;
+  W.all=W.files.trim().split(/\s+/).map(f=>{
     const src=IMAGE_BASE+encodeURIComponent(W.folder)+'/'+encodeURIComponent(f+EXT);
-    const it={file:f+EXT,name:pretty(f),src,img:null,ok:false};
+    const it={id:f,name:NAMES[f]||pretty(f),en:pretty(f),src,img:null,ok:false};
     const im=new Image();im.decoding='async';
     im.onload=()=>{it.img=im;it.ok=true;queueDraw(W)};
-    im.onerror=()=>{it.ok=false};
     im.src=src;return it;
   });
-  W.rot=0;W.spinning=false;W.pick=null;
+  if(DEPENDS[W.key]){
+    W.none={id:null,none:true,name:'不加'+W.name,en:'None',src:NONE_IMG,ok:false};
+    W.items=[W.none,...W.all];
+  }else W.items=W.all;
+  W.rot=0;W.spinning=false;W.pick=null;W.lastIdx=-1;
+
   const card=document.createElement('article');card.className='card';
-  card.innerHTML=`<header><h2>${W.name}</h2><span class="n">${W.items.length} 款</span><button class="spin-one">轉${W.name}</button></header>
+  card.innerHTML=`<header><h2>${W.name}</h2><span class="n"></span><button class="spin-one">轉${W.name}</button></header>
+    ${PICKABLE[W.key]?`<label class="picker">或直接選：<select aria-label="直接選${W.name}"><option value="">— 選一件${W.name} —</option>${W.all.map(it=>`<option value="${it.id}">${it.name}（${it.en}）</option>`).join('')}</select></label>`:''}
+    ${DEPENDS[W.key]?'<p class="hint"></p>':''}
     <div class="wheel-box"><div class="pointer" aria-hidden="true"></div><canvas width="880" height="880" aria-label="${W.name}轉盤"></canvas></div>
     <div class="live"><div class="ph"><img alt=""></div><div style="min-width:0"><div class="k">指針指著</div><div class="v"></div></div></div>`;
   $('wheels').appendChild(card);
-  W.card=card;W.cv=card.querySelector('canvas');W.ctx=W.cv.getContext('2d');
-  W.btn=card.querySelector('.spin-one');W.live=card.querySelector('.live');
-  W.liveImg=card.querySelector('.live img');W.liveName=card.querySelector('.live .v');W.liveK=card.querySelector('.live .k');
+  Object.assign(W,{card,cv:card.querySelector('canvas'),btn:card.querySelector('.spin-one'),live:card.querySelector('.live'),
+    liveImg:card.querySelector('.live img'),liveName:card.querySelector('.live .v'),liveK:card.querySelector('.live .k'),
+    count:card.querySelector('.n'),hint:card.querySelector('.hint'),select:card.querySelector('select')});
+  W.ctx=W.cv.getContext('2d');
   W.btn.onclick=()=>spinOne(W);W.cv.onclick=()=>spinOne(W);
-  W.lastIdx=-1;
+  if(W.select)W.select.onchange=()=>{const it=W.all.find(x=>x.id===W.select.value);if(!it||W.spinning)return;if(W.key==='top')chooseTop(it,true);else choose(W,it)};
   const opt=document.createElement('option');opt.value=W.key;opt.textContent=W.name;$('target').appendChild(opt);
-  // slot
   const slot=document.createElement('div');slot.className='slot';
   slot.innerHTML=`<div class="ph">?</div><div class="t"><div class="k">${W.name}</div><div class="v">—</div></div>`;
   $('slots').appendChild(slot);W.slot=slot;
 });
+
+function setCount(W){W.count.textContent=DEPENDS[W.key]&&currentTop?`可選 ${W.items.length} 項（含不加）`:`${W.all.length} 款`}
+
+/* 依上衣篩選袖子、領子 */
+function applyTop(top){
+  currentTop=top;
+  ['sleeve','collar'].forEach(k=>{
+    const W=byKey[k];if(!W)return;
+    const rule=COMPAT[top.id]?.[k];
+    const allowed=rule===undefined||rule==='all'?W.all:W.all.filter(it=>rule.includes(it.id));
+    W.items=[W.none,...allowed];
+    W.pick=null;W.lastIdx=-1;W.live.classList.remove('won');
+    W.card.classList.remove('locked');
+    const only=W.items.length===1;
+    W.hint.innerHTML=only?`<b>${top.name}</b> 不配${W.name}。`:
+      (allowed.length===W.all.length?`<b>${top.name}</b> 可以配所有${W.name}。`:`<b>${top.name}</b> 只能配這 ${allowed.length} 款${W.name}，或不加。`);
+    W.btn.disabled=only;
+    setCount(W);
+    if(only){W.rot=0;W.pick=W.none;setSlot(W);W.live.classList.add('won');W.liveK.textContent='結果'}
+    else resetSlot(W);
+    draw(W);
+  });
+}
+function lockDependents(){
+  ['sleeve','collar'].forEach(k=>{const W=byKey[k];if(!W)return;
+    W.card.classList.add('locked');W.btn.disabled=true;W.hint.innerHTML='先轉出或選好上衣，這裡才會列出能搭配的款式。';setCount(W);draw(W)});
+}
+/* 直接選：把轉盤轉到那一格 */
+function choose(W,it){
+  const i=W.items.indexOf(it);W.rot=-i*(Math.PI*2/W.items.length);W.lastIdx=-1;W.pick=it;draw(W);
+  W.live.classList.add('won');W.liveK.textContent='選定';setSlot(W);
+}
+function chooseTop(it,manual){
+  const W=byKey.top;W.pick=it;
+  if(manual){const i=W.items.indexOf(it);W.rot=-i*(Math.PI*2/W.items.length);W.lastIdx=-1;draw(W);W.live.classList.add('won');W.liveK.textContent='選定'}
+  if(W.select)W.select.value=it.id;
+  setSlot(W);applyTop(it);
+}
 
 function textOn(hex){const v=parseInt(hex.slice(1),16);const r=v>>16&255,g=v>>8&255,b=v&255;return (r*299+g*587+b*114)/1000>150?'#1b1b1b':'#ffffff'}
 
@@ -197,40 +476,46 @@ function draw(W){
   ctx.save();ctx.translate(C,C);
   ctx.beginPath();ctx.arc(0,0,R+10,0,Math.PI*2);ctx.fillStyle=st.rim;ctx.fill();
   ctx.rotate(W.rot);
-  // thumbnail size that fits the slice near the rim
-  const s=Math.min(R*0.4,0.88*2*(R*0.86)*Math.sin(a/2));
-  const rho=R-s/2-10;
+  const s=n===1?R*0.7:Math.min(R*0.42,0.88*2*(R*0.86)*Math.sin(a/2));
+  const rho=n===1?0:R-s/2-10;
   W.items.forEach((it,i)=>{
     const s0=-Math.PI/2+i*a-a/2;
     ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,R,s0,s0+a);ctx.closePath();
-    ctx.fillStyle=pal[i%pal.length];ctx.fill();
+    ctx.fillStyle=it.none?'#e9ecf3':pal[i%pal.length];ctx.fill();
     ctx.save();ctx.rotate(s0+a/2+Math.PI/2);
     ctx.beginPath();ctx.arc(0,-rho,s/2,0,Math.PI*2);ctx.fillStyle='#ffffff';ctx.fill();
-    if(it.ok){ctx.save();ctx.clip();const iw=it.img.width,ih=it.img.height,k=Math.min(s*0.92/iw,s*0.92/ih);
+    if(it.none){
+      ctx.strokeStyle='#8a93ad';ctx.lineWidth=Math.max(2,s*0.06);
+      ctx.beginPath();ctx.arc(0,-rho,s*0.28,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-s*0.2,-rho+s*0.2);ctx.lineTo(s*0.2,-rho-s*0.2);ctx.stroke();
+    }else if(it.ok){ctx.save();ctx.clip();const iw=it.img.width,ih=it.img.height,k=Math.min(s*0.92/iw,s*0.92/ih);
       ctx.drawImage(it.img,-iw*k/2,-rho-ih*k/2,iw*k,ih*k);ctx.restore()}
     ctx.restore();
   });
-  // separators
   if(n>1){ctx.strokeStyle=st.line;ctx.lineWidth=n>40?1.5:3;ctx.beginPath();
     for(let i=0;i<n;i++){const s0=-Math.PI/2+i*a-a/2;ctx.moveTo(0,0);ctx.lineTo(Math.cos(s0)*R,Math.sin(s0)*R)}ctx.stroke()}
   ctx.restore();
-  // hub
-  ctx.beginPath();ctx.arc(C,C,52,0,Math.PI*2);ctx.fillStyle=st.rim;ctx.fill();
-  ctx.beginPath();ctx.arc(C,C,41,0,Math.PI*2);ctx.fillStyle=settings.pointer;ctx.fill();
-  ctx.fillStyle=textOn(settings.pointer);ctx.font='700 30px "LXGW WenKai TC","Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(W.name.slice(0,1),C,C+2);
+  if(n>1){
+    ctx.beginPath();ctx.arc(C,C,52,0,Math.PI*2);ctx.fillStyle=st.rim;ctx.fill();
+    ctx.beginPath();ctx.arc(C,C,41,0,Math.PI*2);ctx.fillStyle=settings.pointer;ctx.fill();
+    ctx.fillStyle=textOn(settings.pointer);ctx.font='700 30px "LXGW WenKai TC","Noto Sans TC",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(W.name.slice(0,1),C,C+2);
+  }
   updateLive(W);
 }
 function idxAt(W){const n=W.items.length,a=Math.PI*2/n;return ((Math.round(-W.rot/a)%n)+n)%n}
+function nameHTML(it){return `${it.name}<span class="en">${it.en}</span>`}
 function updateLive(W){
   const i=idxAt(W);if(i===W.lastIdx)return;W.lastIdx=i;const it=W.items[i];
-  W.liveImg.src=it.src;W.liveImg.onerror=()=>{W.liveImg.onerror=null;W.liveImg.src=PLACEHOLDER};W.liveName.textContent=it.name;
+  W.liveImg.onerror=()=>{W.liveImg.onerror=null;W.liveImg.src=PLACEHOLDER};W.liveImg.src=it.src;W.liveName.innerHTML=nameHTML(it);
 }
 
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function spinWheel(W,dur){
   return new Promise(res=>{
     if(W.spinning)return res(null);
+    if(W.items.length===1){W.pick=W.items[0];setSlot(W);return res(W.pick)}
     W.spinning=true;W.btn.disabled=true;W.live.classList.remove('won');W.liveK.textContent='轉動中…';
+    if(W.select)W.select.disabled=true;
     const n=W.items.length,a=Math.PI*2/n,pick=Math.floor(Math.random()*n);
     const TAU=Math.PI*2,jitter=(Math.random()-.5)*a*.6;
     const target=((-pick*a+jitter)%TAU+TAU)%TAU;
@@ -240,28 +525,45 @@ function spinWheel(W,dur){
     const d=reduce?500:dur,t0=performance.now(),ease=t=>1-Math.pow(1-t,4);
     (function step(now){const t=Math.min(1,(now-t0)/d);W.rot=start+(final-start)*ease(t);draw(W);
       if(t<1)requestAnimationFrame(step);
-      else{W.spinning=false;W.btn.disabled=false;W.pick=W.items[pick];W.live.classList.add('won');W.liveK.textContent='抽中了';
+      else{W.spinning=false;W.btn.disabled=false;if(W.select)W.select.disabled=false;
+        W.pick=W.items[pick];W.live.classList.add('won');W.liveK.textContent='抽中了';if(W.select)W.select.value=W.pick.id||'';
         W.lastIdx=-1;updateLive(W);setSlot(W);res(W.pick)}})(t0);
   });
 }
 function setSlot(W){
   const it=W.pick;const ph=W.slot.querySelector('.ph');
-  ph.innerHTML='';const im=new Image();im.alt='';im.src=it.src;im.onerror=()=>{im.onerror=null;im.src=PLACEHOLDER};ph.appendChild(im);
-  W.slot.querySelector('.v').textContent=it.name;
+  ph.innerHTML='';const im=new Image();im.alt='';im.onerror=()=>{im.onerror=null;im.src=PLACEHOLDER};im.src=it.src;ph.appendChild(im);
+  W.slot.querySelector('.v').innerHTML=nameHTML(it);
 }
-function spinOne(W){if(!W.spinning)spinWheel(W,4200+Math.random()*800)}
+function resetSlot(W){W.slot.querySelector('.ph').textContent='?';W.slot.querySelector('.v').textContent='—'}
+const anySpinning=()=>WHEELS.some(W=>W.spinning);
+async function spinOne(W){
+  if(W.spinning||W.card.classList.contains('locked'))return;
+  if(W.key==='top'){
+    // 換上衣時，袖子和領子要等上衣停下來才能轉
+    ['sleeve','collar'].forEach(k=>byKey[k]&&(byKey[k].btn.disabled=true));
+    const it=await spinWheel(W,4600);
+    if(it)chooseTop(it,false);
+  }else spinWheel(W,4200+Math.random()*800);
+}
 const history=[];
 $('spinAll').onclick=async()=>{
-  if(WHEELS.some(W=>W.spinning))return;
+  if(anySpinning())return;
   $('spinAll').disabled=true;
-  const picks=await Promise.all(WHEELS.map((W,i)=>spinWheel(W,3800+i*700)));
+  const top=byKey.top;
+  ['sleeve','collar'].forEach(k=>byKey[k]&&(byKey[k].btn.disabled=true));
+  const skirtP=byKey.skirt?spinWheel(byKey.skirt,5200):Promise.resolve(null);
+  const t=await spinWheel(top,3600);
+  chooseTop(t,false);
+  const rest=await Promise.all([skirtP,...['sleeve','collar'].map((k,i)=>byKey[k]?spinWheel(byKey[k],3000+i*700):null)]);
   $('spinAll').disabled=false;
-  history.unshift(picks.map(p=>p?p.name:'—').join(' ＋ '));
-  if(history.length>1){$('hist').hidden=false;$('hist').textContent='上一組：'+history[1]+(history[2]?'　再上一組：'+history[2]:'')}
+  const picks=[t,...rest].filter(Boolean);
+  history.unshift(picks.map(p=>p.name).join(' ＋ '));
   if(history.length>3)history.length=3;
+  if(history.length>1){$('hist').hidden=false;$('hist').textContent='上一組：'+history[1]+(history[2]?'　再上一組：'+history[2]:'')}
 };
 
-// colour settings
+// 顏色設定
 const presetBox=$('presets');
 Object.entries(PRESETS).forEach(([name,cols])=>{
   const b=document.createElement('button');b.type='button';b.className='preset';b.dataset.p=name;
@@ -282,7 +584,7 @@ $('rimColor').addEventListener('input',e=>{targets().forEach(W=>settings.wheels[
 $('lineColor').addEventListener('input',e=>{targets().forEach(W=>settings.wheels[W.key].line=e.target.value);save();WHEELS.forEach(draw)});
 $('pointerColor').addEventListener('input',e=>{settings.pointer=e.target.value;save();syncUI();WHEELS.forEach(draw)});
 
-syncUI();WHEELS.forEach(draw);
+syncUI();WHEELS.forEach(W=>{setCount(W);draw(W)});lockDependents();
 if(document.fonts)document.fonts.ready.then(()=>WHEELS.forEach(draw));
 })();
 </script>
